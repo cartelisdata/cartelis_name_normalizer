@@ -2,9 +2,15 @@ MANIFEST.in
 README.md
 setup.py
 cartelis_name_normalizer/__init__.py
+cartelis_name_normalizer/action_map.py
+cartelis_name_normalizer/actions.py
 cartelis_name_normalizer/module.py
+cartelis_name_normalizer/rule_engine.py
 cartelis_name_normalizer.egg-info/PKG-INFO
 cartelis_name_normalizer.egg-info/SOURCES.txt
 cartelis_name_normalizer.egg-info/dependency_links.txt
 cartelis_name_normalizer.egg-info/top_level.txt
 cartelis_name_normalizer/data/base_prenoms.csv
+cartelis_name_normalizer/data/regles_normalisation.xlsx
+cartelis_name_normalizer/data/sample_personne_test.csv
+cartelis_name_normalizer/data/~$regles_normalisation.xlsx

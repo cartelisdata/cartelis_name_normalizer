@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="cartelis_name_normalizer",              # nom sur PyPI (doit être unique)
-    version="1.1.6",
+    version="1.2.8",
     author="Adam El Hachimi",
     author_email="adam.elhachimi@cartelis.com",
     description="Normalisation des noms et prénoms (nettoyage, patterns, détection d’anomalies)",
@@ -10,7 +10,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/vous/ma-biblio",
     packages=find_packages(),      # trouve automatiquement vos paquets
-    package_data={"cartelis_name_normalizer": ["data/*.csv"]},
+    package_data={"cartelis_name_normalizer": ["data/*.csv", "data/*.xlsx"]},  # inclut les fichiers de données
     python_requires=">=3.8",
     install_requires=[             # vos dépendances externes, ex:
         # "requests>=2.28",

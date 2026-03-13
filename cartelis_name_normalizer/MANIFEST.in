@@ -1,1 +1,2 @@
 include cartelis_name_normalizer/data/*.csv
+include cartelis_name_normalizer/data/*.xlsx

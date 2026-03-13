@@ -1,27 +1,45 @@
 
 
 
-def normalize_names(df, value = None, nettoyage=True, overlap_cleaning=True, pattern_detection=True, normalization=True):
+def normalize_names(df, nettoyage=True, overlap_cleaning=True, pattern_detection=True, normalization=True):
     '''
-    Nettoie et normalise une ou plusieurs colonnes de noms dans un pandas.DataFrame.
+    Nettoie et normalise les colonnes de noms et prénoms d'un pandas.DataFrame.
 
     Parameters
     ----------
-    - df : pandas.DataFrame : DataFrame d'entrée contenant la(les) colonne(s) à normaliser.
-    - value : str or list of str or None, default None : Nom de la colonne à normaliser, ou liste de colonnes. Si None, la fonction tente
-        d'identifier automatiquement les colonnes candidates.
-    - nettoyage : bool, default True : Effectue le nettoyage de base (trim, collapse d'espaces, suppression de ponctuation).
-    - overlap_cleaning : bool, default True : Résout les chevauchements et doublons internes (ex. "Jean Jean" -> "Jean").
-    - pattern_detection : bool, default True : Détecte et corrige des motifs fréquents (inversion "Last, First", titres, initiales).
-    - normalization : bool, default True : Applique les règles de normalisation (capitalisation, ordre Prénom/Nom, translittération).
-    - dict_check : bool, default True : Vérifie et, si possible, corrige les noms à partir d'un dictionnaire/fichier de référence
-        (fuzzy matching). Requiert un dictionnaire optionnel pour être pleinement efficace.
+    df : pandas.DataFrame
+        DataFrame d'entrée contenant les colonnes à normaliser. Doit contenir
+        les colonnes "nom" et "prenom". Les colonnes "prenom2" et "nomUsage"
+        sont optionnelles et utilisées si présentes.
+    nettoyage : bool, default True
+        Effectue le nettoyage de base : trim, suppression des accents et ponctuation.
+    overlap_cleaning : bool, default True
+        Résout les chevauchements entre nom et prénom (ex. "Jean Jean" -> "Jean").
+    pattern_detection : bool, default True
+        Détecte le schéma de chaque valeur (W, L, H, P, A, S).
+    normalization : bool, default True
+        Applique les règles de normalisation définies dans regles_normalisation.xlsx.
 
     Returns
     -------
-    pandas.DataFrame : Copie du DataFrame d'entrée avec une ou plusieurs colonnes ajoutées/remplacées par leur version normalisée 
-    (nom_colonne_normalized). Peut aussi inclure une colonne nom_colonne_notes contenant le journal des transformations réalisées.
+    pandas.DataFrame
+        Copie du DataFrame avec les colonnes ajoutées suivantes :
 
+        - ``nom_clean``         : nom après nettoyage de base
+        - ``prenom_clean``      : prénom après nettoyage de base
+        - ``schema_nom``        : schéma détecté pour le nom (ex: W, W-P, H)
+        - ``schema_prenom``     : schéma détecté pour le prénom
+        - ``nom_normalized``    : nom après normalisation complète
+        - ``prenom_normalized`` : prénom après normalisation complète
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from cartelis_name_normalizer import normalize_names
+    >>> df = pd.DataFrame({"nom": ["DE LA CROIX"], "prenom": ["MARIE123"]})
+    >>> normalize_names(df)[["nom_normalized", "prenom_normalized"]]
+      nom_normalized prenom_normalized
+    0    DE LA CROIX             MARIE
     '''
 
 
@@ -32,6 +50,11 @@ def normalize_names(df, value = None, nettoyage=True, overlap_cleaning=True, pat
     import unicodedata
     import pandas as pd
     import numpy as np
+    import re
+    import pandas as pd
+    import unicodedata
+    from rapidfuzz import process, fuzz
+    import os
 
     df_final = df.copy()
 
@@ -318,466 +341,36 @@ def normalize_names(df, value = None, nettoyage=True, overlap_cleaning=True, pat
 
 
 
-
-
-
-
-
-
-
-
     #_____________________NORMALISATION____________________________________
 
 
-
     if normalization:
-        #_____________________PRENOM___________________________________________
+        from .rule_engine import _load_rules, apply_rule, _normalize_token
+        # Chargement des règles depuis l'Excel
+        rules_prenom = _load_rules("regles_prenom")
+        rules_nom    = _load_rules("regles_nom")
 
-        import os
+        # Chargement du dictionnaire de prénoms
         _DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
         base_prenoms = pd.read_csv(os.path.join(_DATA_DIR, "base_prenoms.csv"))
+        PRENOM_SET = {_normalize_token(p) for p in base_prenoms["first_name_norm"].dropna().unique() if p}
 
-        def normalize_name(s):
-            if not isinstance(s, str):
-                return None
-            s = str(s).strip()
-            
-            # suppression des accents
-            s = "".join(
-                c for c in unicodedata.normalize("NFD", s)
-                if unicodedata.category(c) != "Mn"
-            )
-            
-            # 🔹 garder uniquement lettres et espaces
-            s = re.sub(r"[^a-z\s]", " ", s)
-            
-            # suppression espaces multiples
-            s = " ".join(s.split())
-            
-            return s.upper() if s else None
-
-        prenoms_base = set(
-            base_prenoms["first_name_norm"].dropna().unique()
+        # Application prenom
+        df_final["prenom_normalized"] = df_final.apply(
+            lambda row: apply_rule(row, rules=rules_prenom, schema_col="schema_prenom", prenom_set=PRENOM_SET),
+            axis=1
         )
 
-        PRENOM_SET = {
-            normalize_name(p)
-            for p in prenoms_base
-            if p is not None
-        }
+        # Application nom
+        df_final["nom_normalized"] = df_final.apply(
+            lambda row: apply_rule(row, rules=rules_nom, schema_col="schema_nom"),
+            axis=1)
 
-        def strip_accents(s: str) -> str:
-            return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
-
-        def normalize_prenom(s):
-            if pd.isna(s):
-                return None
-            s = str(s).strip()
-            if not s:
-                return None
-            s = strip_accents(s)
-            s = s.upper()
-            # uniformiser séparateurs
-            s = re.sub(r"[’'`]", " ", s)      # apostrophes -> espace
-            s = re.sub(r"[_/]", " ", s)       # séparateurs divers -> espace
-            s = re.sub(r"[.]", " ", s) 
-            s = re.sub(r"[,]", " ", s) 
-            s = re.sub(r"[?]", "", s) 
-            s = re.sub(r"\s+", " ", s).strip()
-            return s if s else None
-
-        def split_tokens_space_and_hyphen(prenom_norm: str):
-            """
-            Découpe en tokens en éclatant espaces et tirets.
-            Ex: "MARIE-THERESE GDS" -> ["MARIE","THERESE","GDS"]
-            """
-            if not prenom_norm:
-                return []
-            # remplacer tirets par espaces pour split
-            s = prenom_norm.replace("-", " ")
-            s = re.sub(r"\s+", " ", s).strip()
-            return [t for t in s.split(" ") if t]
-
-        def is_valid_token(token: str, prenom_set: set) -> bool:
-            return (token is not None) and (token in prenom_set)
-
-        def join_tokens(tokens):
-            return " ".join([t for t in tokens if t]).strip() or None
-
-        # -------------------------------------------------------------------
-        # 3) Règles
-        # -------------------------------------------------------------------
-        RULE1_NO_CHANGE = {"W", "H", "A", "P-W", "L-W"}
-        RULE2_CONCAT = {None, np.nan, "L", "P"}  # NA + L + P
-
-        def apply_rule_2_concat(prenom_norm, prenom2_norm):
-            """
-            Si prenom2 non null => concat prenom + prenom2, sinon inchangé.
-            """
-            if prenom2_norm:
-                if prenom_norm:
-                    return f"{prenom_norm} {prenom2_norm}"
-                return prenom2_norm
-            return prenom_norm
-
-        def clean_token_for_dict_compare(token: str) -> str:
-            if token is None:
-                return ""
-            
-            token = str(token).strip()
-            
-            # Supprimer les chiffres
-            token = re.sub(r"\d+", "", token)
-            
-            # Supprimer la ponctuation parasite sauf apostrophe et tiret
-            token = re.sub(r"[^A-Za-zÀ-ÿ'’-]", "", token)
-            
-            return token.strip()
-
-
-        def apply_rule_3_patterns_S(prenom_norm, prenom_set):
-            """
-            Pour patterns contenant 'S':
-            - split en sous-tokens (espaces + tirets)
-            - nettoyer chaque sous-token avant comparaison
-            - garder seulement ceux présents dans le dictionnaire
-            - reconstruire
-            """
-            toks = split_tokens_space_and_hyphen(prenom_norm)
-
-            kept = []
-            for t in toks:
-                t_clean = clean_token_for_dict_compare(t)
-                if t_clean and is_valid_token(t_clean, prenom_set):
-                    kept.append(t_clean)
-
-            return join_tokens(kept)
-
-        def apply_rule_4_drop_truncated_last(prenom_norm, schema_prenom, prenom_set):
-            """
-            Règle principale:
-            - vérifier le dernier token réel (space-split)
-            - s'il n'existe pas dans le dico => supprimer dernier token
-            - puis supprimer aussi les particules isolées P/L qui précèdent immédiatement
-            Cas particulier: si le dernier élément du pattern (schema) == 'H':
-            - on regarde le dernier sous-token réel (après split '-')
-            - si non valide => supprimer ce sous-token dans le dernier token réel
-            - puis même logique de suppression P/L si nécessaire
-            """
-            if not prenom_norm:
-                return None
-
-            # tokens "réels" = split par espace (on conserve les tirets dans le token pour cas H)
-            real = re.sub(r"\s+", " ", prenom_norm).strip().split(" ")
-            if not real:
-                return None
-
-            # déterminer dernier élément de schema (ex: "W-H" -> "H", "H-P-P-W" -> "W")
-            last_schema = None
-            if schema_prenom is not None and not pd.isna(schema_prenom):
-                sp = str(schema_prenom).strip().upper()
-                if sp:
-                    parts = sp.split("-")
-                    last_schema = parts[-1] if parts else None
-
-            def drop_particles_PL(tokens):
-                while tokens and tokens[-1] in {"P", "L"}:
-                    tokens.pop()
-                return tokens
-
-            # --- cas particulier: dernier schema == H
-            if last_schema == "H":
-                # dernier token réel (peut contenir des tirets: ex "MARIE-THERE")
-                last_real = real[-1]
-                sub = last_real.split("-")
-                # dernier sous-token réel
-                last_sub = sub[-1] if sub else None
-                if last_sub and not is_valid_token(last_sub, prenom_set):
-                    # supprimer le dernier sous-token
-                    sub = sub[:-1]
-                    if sub:
-                        real[-1] = "-".join(sub)  # on conserve le reste (ex: "MARIE")
-                    else:
-                        real.pop()                # plus rien => enlever le token entier
-
-                    # ensuite supprimer particules P/L à la fin si présentes
-                    real = drop_particles_PL(real)
-
-                # si le dernier sous-token est valide => rien à faire
-                return " ".join(real).strip() or None
-
-            # --- cas général: vérifier le dernier token réel (en éclatant aussi les tirets)
-            # on considère que le "dernier token" à valider = dernier sous-token après split tiret
-            last_real = real[-1]
-            last_sub = last_real.split("-")[-1] if last_real else None
-
-            if last_sub and is_valid_token(last_sub, prenom_set):
-                return " ".join(real).strip() or None
-
-            # sinon tronqué => supprimer le dernier token réel
-            real.pop()
-
-            # puis supprimer P/L isolés qui précèdent immédiatement
-            real = drop_particles_PL(real)
-
-            return " ".join(real).strip() or None
-
-        # -------------------------------------------------------------------
-        # 4) Fonction finale : prenom_CRM
-        # -------------------------------------------------------------------
-        def build_prenom_crm(row, prenom_set: set):
-            prenom_norm = normalize_prenom(row.get("prenom_clean"))
-            schema = row.get("schema_prenom")
-            schema_norm = None if pd.isna(schema) else str(schema).strip().upper()
-
-            prenom2_norm = normalize_prenom(row.get("prenom2")) if "prenom2" in row else None
-
-            # Règle 1 — aucune transformation
-            if schema_norm in RULE1_NO_CHANGE:
-                return prenom_norm
-
-            # Règle 2 — concat avec prenom2 (schema NA, L, P)
-            if schema_norm in {"L", "P"} or schema_norm is None:
-                base = apply_rule_2_concat(prenom_norm, prenom2_norm)
-                return base
-
-            # Règle 3 — patterns contenant S
-            if schema_norm and "S" in schema_norm:
-                return apply_rule_3_patterns_S(prenom_norm, prenom_set)
-
-            # Règle 4 — suppression du dernier élément tronqué (cas général)
-            return apply_rule_4_drop_truncated_last(prenom_norm, schema_norm, prenom_set)
-
-        # -------------------------------------------------------------------
-        # 5) Application
-        # -------------------------------------------------------------------
-        personne_CRM_1 = df_final.copy()
-        personne_CRM_1["prenom_normalized"] = personne_CRM_1.apply(build_prenom_crm, axis=1, prenom_set=PRENOM_SET)
-
-
-    #__________________________________NOM_____________________________________
-
-        SEP_PATTERN_NAME = r"[\s\-_/\.,]+"   # séparateurs identifiés pour les noms
-
-
-        def split_name_tokens_raw(nom_raw: str):
-            """
-            Découpe un nom en sous-tokens selon les séparateurs identifiés.
-            On enlève seulement les '?' avant split.
-            """
-            if nom_raw is None or pd.isna(nom_raw):
-                return []
-            s = str(nom_raw).strip()
-            if not s:
-                return []
-            s = s.replace("?", "")
-            tokens = [t for t in re.split(SEP_PATTERN_NAME, s) if t]
-            return tokens
-
-
-        def clean_name_subtoken(token: str) -> str:
-            """
-            Nettoyage d'un sous-token pour la règle S :
-            - suppression des accents
-            - suppression des chiffres
-            - suppression des caractères parasites
-            - conservation des lettres + apostrophe interne éventuelle
-            """
-            if token is None or pd.isna(token):
-                return None
-
-            t = str(token).strip()
-            if not t:
-                return None
-
-            # normalisation unicode + suppression accents
-            t = unicodedata.normalize("NFKD", t)
-            t = "".join(c for c in t if not unicodedata.combining(c))
-
-            # harmonisation apostrophes
-            t = t.replace("’", "'").replace("`", "'").replace("´", "'")
-
-            # suppression chiffres
-            t = re.sub(r"\d+", "", t)
-
-            # garder seulement lettres + apostrophe
-            # ex: D' -> conservé ; EDDLESTON3 -> EDDLESTON
-            t = re.sub(r"[^A-Za-z']", "", t)
-
-            # enlever apostrophes parasites en début/fin
-            t = re.sub(r"^'+|'+$", "", t)
-
-            return t if t else None
-
-
-        def normalize_spaces(s: str) -> str:
-            if s is None:
-                return None
-            s = re.sub(r"\s+", " ", str(s)).strip()
-            return s if s else None
-
-
-        # =========================================================
-        # 2. RÈGLE 1 — patterns contenant "S"
-        # =========================================================
-
-        def apply_rule_1_S_clean_subtokens(nom_raw):
-            """
-            Règle 1 — patterns contenant 'S'
-            - split en sous-tokens (espaces, tirets, _, /, ., ,)
-            - nettoyer chaque sous-token
-            - reconstruire avec des espaces
-            Ex:
-            SAINT-LOUIS-AUGUSTIN   -> SAINT LOUIS AUGUSTIN
-            MORAN EDDLESTON3       -> MORAN EDDLESTON
-            FOSSART DE ROZEVILLE-  -> FOSSART DE ROZEVILLE
-            """
-            toks = split_name_tokens_raw(nom_raw)
-            cleaned = [clean_name_subtoken(t) for t in toks]
-            cleaned = [t for t in cleaned if t]
-            return " ".join(cleaned).strip() or None
-
-
-        # =========================================================
-        # 3. RÈGLE 2 — patterns P / P-P / L-P
-        # =========================================================
-
-        RULE2_CONCAT_USAGE = {"P", "P-P", "L-P"}
-
-        def apply_rule_2_concat_nom_usage(nom_raw, nom_usage_raw):
-            """
-            Si nomUsage non null => concaténer nom + nomUsage
-            Sinon => conserver nom tel quel
-            """
-            nom = None if nom_raw is None or pd.isna(nom_raw) else str(nom_raw).strip()
-            nom_usage = None if nom_usage_raw is None or pd.isna(nom_usage_raw) else str(nom_usage_raw).strip()
-
-            if nom_usage:
-                if nom:
-                    return f"{nom} {nom_usage}".strip()
-                return nom_usage
-            return nom if nom else None
-
-
-        # =========================================================
-        # 4. RÈGLE 3 — patterns L / L-L
-        # =========================================================
-
-        RULE3_REPLACE_BY_USAGE = {"L", "L-L"}
-
-        def apply_rule_3_replace_by_nom_usage(nom_raw, nom_usage_raw):
-            """
-            Si nomUsage non null => remplacer le nom par nomUsage
-            Sinon => conserver nom tel quel
-            """
-            nom = None if nom_raw is None or pd.isna(nom_raw) else str(nom_raw).strip()
-            nom_usage = None if nom_usage_raw is None or pd.isna(nom_usage_raw) else str(nom_usage_raw).strip()
-
-            if nom_usage:
-                return nom_usage
-            return nom if nom else None
-
-
-        # =========================================================
-        # 5. RÈGLE 4 — suppression des particules finales L / P
-        # =========================================================
-
-        def apply_rule_4_drop_final_LP_tokens(nom_raw, schema_nom):
-            """
-            Pour tous les autres patterns :
-            si le pattern se termine par L ou P, on supprime les tokens finaux
-            tant que les derniers éléments du schéma sont L ou P.
-
-            Hypothèse : on travaille au niveau des sous-tokens découpés selon
-            les séparateurs identifiés, puis on reconstruit avec des espaces.
-            """
-            if nom_raw is None or pd.isna(nom_raw):
-                return None
-
-            s = str(nom_raw).strip().replace("?", "")
-            if not s:
-                return None
-
-            schema_norm = None if schema_nom is None or pd.isna(schema_nom) else str(schema_nom).strip().upper()
-            if not schema_norm:
-                return normalize_spaces(s)
-
-            schema_parts = [x for x in schema_norm.split("-") if x]
-            if not schema_parts:
-                return normalize_spaces(s)
-
-            toks = split_name_tokens_raw(s)
-            if not toks:
-                return None
-
-            # Tant que le schéma finit par L/P, on supprime en cascade
-            while schema_parts and schema_parts[-1] in {"L", "P"} and toks:
-                schema_parts.pop()
-                toks.pop()
-
-            return " ".join(toks).strip() or None
-
-
-        # =========================================================
-        # 6. RÈGLE 5 — conserver tel quel
-        # =========================================================
-
-        def apply_rule_5_keep_as_is(nom_raw):
-            if nom_raw is None or pd.isna(nom_raw):
-                return None
-            out = str(nom_raw).strip()
-            return out if out else None
-
-
-        # =========================================================
-        # 7. FONCTION PRINCIPALE
-        # =========================================================
-
-        def build_nom_crm(row):
-            nom_raw = row.get("nom_clean")
-            nom_usage_raw = row.get("nomUsage") if "nomUsage" in row else None
-            schema_nom = row.get("schema_nom")
-
-            schema_norm = None if schema_nom is None or pd.isna(schema_nom) else str(schema_nom).strip().upper()
-
-            # Règle 1 — patterns contenant S
-            if schema_norm and "S" in schema_norm:
-                return apply_rule_1_S_clean_subtokens(nom_raw)
-
-            # Règle 2 — P / P-P / L-P
-            if schema_norm in RULE2_CONCAT_USAGE:
-                return apply_rule_2_concat_nom_usage(nom_raw, nom_usage_raw)
-
-            # Règle 3 — L / L-L
-            if schema_norm in RULE3_REPLACE_BY_USAGE:
-                return apply_rule_3_replace_by_nom_usage(nom_raw, nom_usage_raw)
-
-            # Règle 4 — autres patterns finissant par L/P
-            if schema_norm:
-                schema_parts = [x for x in schema_norm.split("-") if x]
-                if schema_parts and schema_parts[-1] in {"L", "P"}:
-                    return apply_rule_4_drop_final_LP_tokens(nom_raw, schema_norm)
-
-            # Règle 5 — tous les autres patterns
-            return apply_rule_5_keep_as_is(nom_raw)
-
-
-        # =========================================================
-        # 8. APPLICATION
-        # =========================================================
-
-        personne_CRM_2 = personne_CRM_1.copy()
-        personne_CRM_2["nom_normalized"] = personne_CRM_2.apply(build_nom_crm, axis=1)
-        
-        df_final = personne_CRM_2
 
 
 
     #_______________________________VERIFICATION DICT____________________________________
 
-    import re
-    import pandas as pd
-    import unicodedata
 
     def canon(s):
         if s is None or pd.isna(s):
@@ -805,11 +398,8 @@ def normalize_names(df, value = None, nettoyage=True, overlap_cleaning=True, pat
     df_final["prenom_all_exist"] = df_final["prenom"].apply(lambda x: prenom_exists_all_tokens(x, PRENOM_SET))
 
 
-    #_______________________________VERIFICATION DICT____________________________________
-    import re
-    import pandas as pd
-    import unicodedata
-    from rapidfuzz import process, fuzz
+    #_______________________________PRENOM PLUS PROCHE____________________________________
+
 
     MIN_TOKEN_LENGTH = 2
     THRESHOLD = 90
@@ -901,9 +491,9 @@ def normalize_names(df, value = None, nettoyage=True, overlap_cleaning=True, pat
         }
 
 
-    # ── Application ────────────────────────────────────────────────────────────────
+    # ______________________________________ Application __________________________________________
     # On applique UNE SEULE FOIS et on stocke dans une Series de dicts
-    corrections = df_final["prenom"].apply(
+    corrections = df_final["prenom_normalized"].apply(
         lambda x: corriger_prenom(x, PRENOM_SET, threshold=THRESHOLD, min_length=MIN_TOKEN_LENGTH)
     )
 
@@ -914,5 +504,6 @@ def normalize_names(df, value = None, nettoyage=True, overlap_cleaning=True, pat
 
 
     return df_final
+
 
 
