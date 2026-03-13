@@ -1,0 +1,10 @@
+MANIFEST.in
+README.md
+setup.py
+cartelis_name_normalizer/__init__.py
+cartelis_name_normalizer/module.py
+cartelis_name_normalizer.egg-info/PKG-INFO
+cartelis_name_normalizer.egg-info/SOURCES.txt
+cartelis_name_normalizer.egg-info/dependency_links.txt
+cartelis_name_normalizer.egg-info/top_level.txt
+cartelis_name_normalizer/data/base_prenoms.csv
