@@ -1,0 +1,36 @@
+README — normalize_names
+
+But : Ce README et la docstring décrivent une fonction Python normalize_names(df, value=None, nettoyage=True, overlap_cleaning=True, pattern_detection=True, normalization=True, dict_check=True) destinée à nettoyer et normaliser des colonnes de noms dans un pandas.DataFrame. Le texte est en français et contient : usage, paramètres, comportement des options, exemples et bonnes pratiques.
+
+Objectif
+
+normalize_names prend en entrée un DataFrame et applique une série d'opérations (suppression d'erreurs typographiques simples, détection de motifs, harmonisation d'ordres prénom/nom, vérification contre un dictionnaire, etc.) pour retourner un DataFrame avec une ou plusieurs colonnes de noms normalisées. Le but est d'améliorer la qualité des noms pour des opérations de jointure, déduplication, ou visualisation.
+
+Installation / Dépendances
+
+Requiert (au minimum) :
+
+pandas
+
+numpy
+
+unidecode (pour retirer les accents)
+
+
+Comportement résumé des options
+
+df : pandas.DataFrame d'entrée.
+
+value : nom de la colonne à normaliser (str) ou liste/tuple de colonnes à normaliser. Si None, la fonction essaie de détecter automatiquement la(les) colonne(s) contenant des noms (heuristique : colonnes textuelles avec mots capitalisés fréquents).
+
+nettoyage (bool) : opérations de nettoyage de base (strip, lower/upper selon stratégie, suppression d'espaces doublons, suppression de ponctuation inutile).
+
+overlap_cleaning (bool) : atténuation des chevauchements/doublons internes (p. ex. "Jean Jean" → "Jean", "Marie-Anne Marie" → "Marie-Anne").
+
+pattern_detection (bool) : détection et correction de motifs courants (inversions "Lastname, Firstname", présence de titres Dr., Mme, initiales mal formatées, format LASTNAME Firstname, etc.).
+
+normalization (bool) : application de règles de normalisation (capitalisation correcte : Jean Dupont, séparation prénom/nom si possible, translittération).
+
+dict_check (bool) : vérification et correction optionnelle via dictionnaire de noms propres / base de référence (fuzzy-matching pour corriger Jahn → John si plausible).
+
+Retourne : un DataFrame (copie par défaut) où la/les colonnes spécifiées sont ajoutées ou remplacées par leur version normalisée. La fonction peut aussi renvoyer un rapport de transformations si demandé.
