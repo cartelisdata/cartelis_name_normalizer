@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="cartelis",              # nom sur PyPI (doit être unique)
-    version="1.5.5",
+    version="1.7.0",
     author="Adam El Hachimi",
     author_email="adam.elhachimi@cartelis.com",
     description="Normalisation des noms et prénoms (nettoyage, patterns, détection d’anomalies)",
