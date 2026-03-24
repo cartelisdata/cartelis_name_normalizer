@@ -1,2 +1,0 @@
-include cartelis/name_normalizer/data/*.csv
-include cartelis/name_normalizer/data/*.xlsx

@@ -1,1 +1,0 @@
-from .module import normalize_phone_vectorized

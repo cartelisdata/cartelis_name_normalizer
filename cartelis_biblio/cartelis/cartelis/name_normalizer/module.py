@@ -16,7 +16,7 @@ base_prenoms = pd.read_csv(os.path.join(_DATA_DIR, "base_prenoms.csv"))
 PRENOM_SET = {_normalize_token(p) for p in base_prenoms["first_name_norm"].dropna().unique() if p}
 
 
-def normalize_names(df, mode: str = "light", nettoyage: bool = True, overlap_cleaning: bool = True, pattern_detection: bool = True, normalization: bool = True, inplace: bool = False):
+def normalize_names(df, mode: str = "light", colonne_nom = "nom", colonne_prenom = "prenom", nettoyage: bool = True, overlap_cleaning: bool = True, pattern_detection: bool = True, normalization: bool = True, inplace: bool = False):
     '''
     Nettoie, détecte des schémas et normalise les colonnes de nom et prénom d'une DataFrame.
 
@@ -46,7 +46,7 @@ def normalize_names(df, mode: str = "light", nettoyage: bool = True, overlap_cle
         DataFrame source contenant au minimum les colonnes `nom` et/ou `prenom` (facultatif,
         mais recommandé).
     mode : str, optional
-        Mode passé au chargeur de règles `_load_rules` (ex: "light", "strict"). Par défaut "light".
+        Mode passé au chargeur de règles `_load_rules` (ex: "light", "heavy"). Par défaut "light".
         Influe sur les règles utilisées pour la normalisation.
     nettoyage : bool, optional
         Si True (par défaut), applique la phase de nettoyage (création de `nom_clean`/`prenom_clean`).
@@ -58,7 +58,7 @@ def normalize_names(df, mode: str = "light", nettoyage: bool = True, overlap_cle
         Si True, applique les règles de normalisation (utilise `_load_rules` et `apply_rule`) et
         créé `prenom_normalized` et `nom_normalized`.
     inplace : bool, default False
-        Si True, modifie le DataFrame d'entrée directement et retourne None.
+        Si True, modifie le DataFrame d'entrée directement.
         Si False, retourne une copie du DataFrame avec les colonnes ajoutées.
 
     Valeurs retournées
@@ -127,13 +127,13 @@ def normalize_names(df, mode: str = "light", nettoyage: bool = True, overlap_cle
         
 
         # NEWWWWW
-        if "nom" in df_final.columns:
-            df_final["nom_clean"] = df_final["nom"].apply(clean_name_display)
+        if colonne_nom in df_final.columns:
+            df_final["nom_clean"] = df_final[colonne_nom].apply(clean_name_display)
         else:
             df_final["nom_clean"] = None
 
-        if "prenom" in df_final.columns:
-            df_final["prenom_clean"] = df_final["prenom"].apply(clean_name_display)
+        if colonne_prenom in df_final.columns:
+            df_final["prenom_clean"] = df_final[colonne_prenom].apply(clean_name_display)
         else:
             df_final["prenom_clean"] = None
 
@@ -348,8 +348,8 @@ def normalize_names(df, mode: str = "light", nettoyage: bool = True, overlap_cle
 
         def insert_columns(df):
             cols = df.columns.tolist()
-            cols = move_after(cols, "schema_nom", "nom")
-            cols = move_after(cols, "schema_prenom", "prenom")
+            cols = move_after(cols, "schema_nom", colonne_nom)
+            cols = move_after(cols, "schema_prenom", colonne_prenom)
             df = df[cols]
             return df
         
@@ -359,15 +359,15 @@ def normalize_names(df, mode: str = "light", nettoyage: bool = True, overlap_cle
 
         if "nom_clean" in df_final.columns:
             df_final["schema_nom"] = df_final["nom_clean"].apply(detect_pattern)
-        elif "nom" in df_final.columns:
-            df_final["schema_nom"] = df_final["nom"].apply(detect_pattern)
+        elif colonne_nom in df_final.columns:
+            df_final["schema_nom"] = df_final[colonne_nom].apply(detect_pattern)
         else:
             df_final["schema_nom"] = None
 
         if "prenom_clean" in df_final.columns:
             df_final["schema_prenom"] = df_final["prenom_clean"].apply(detect_pattern)
-        elif "prenom" in df_final.columns:
-            df_final["schema_prenom"] = df_final["prenom"].apply(detect_pattern)
+        elif colonne_prenom in df_final.columns:
+            df_final["schema_prenom"] = df_final[colonne_prenom].apply(detect_pattern)
         else:
             df_final["schema_prenom"] = None
 
@@ -412,47 +412,50 @@ def normalize_names(df, mode: str = "light", nettoyage: bool = True, overlap_cle
 
     #_______________________________VERIFICATION DICT____________________________________
 
-def verify_prenom(df, mode: str = "light") -> pd.DataFrame:
+def verify_prenom(df, colonne_nom = "nom", colonne_prenom = "prenom", inplace: bool = False) -> pd.DataFrame:
 
     '''
     Vérifie si tous les tokens d'un prénom existent dans le dictionnaire de prénoms.
 
     Description
     -----------
-    Appelle `normalize_names(df, mode)` puis vérifie, pour la colonne `prenom` de la DataFrame
-    normalisée, si **tous** les tokens (séparateurs reconnus : espace, tiret, slash, underscore, point)
-    appartiennent au dictionnaire canonique `PRENOM_SET`. La vérification produit une colonne
-    `prenom_all_exist` contenant les valeurs littérales "oui" ou "non".
+    Vérifie, pour la colonne `colonne_prenom` de la DataFrame normalisée, si **tous** 
+    les tokens appartiennent au dictionnaire canonique `PRENOM_SET`. Produit une 
+    colonne `prenom_all_exist` avec les valeurs "oui" ou "non".
 
     Paramètres
     ----------
     df : pandas.DataFrame
-        DataFrame d'entrée contenant idéalement la colonne `prenom`.
-    mode : str, optional
-        Valeur passée à `normalize_names(df, mode)` (ex. "light", "strict"). Par défaut "light".
+        DataFrame d'entrée contenant idéalement les colonnes `nom` et `prenom`.
+    colonne_nom : str, optional
+        Nom de la colonne contenant les noms. Par défaut "nom".
+    colonne_prenom : str, optional
+        Nom de la colonne contenant les prénoms. Par défaut "prenom".
+    inplace : bool, default False
+        Si True, modifie le DataFrame d'entrée directement.
+        Si False, retourne une copie enrichie.
 
     Valeur retournée
     ----------------
     pandas.DataFrame
-        Copie de la DataFrame renvoyée par `normalize_names` et enrichie par :
-        - `prenom_all_exist` : "oui" si chaque token du prénom figure dans `PRENOM_SET`, sinon "non".
+        DataFrame avec les colonnes `colonne_nom`, `colonne_prenom` et `prenom_all_exist`.
+        - `prenom_all_exist` : "oui" si chaque token figure dans `PRENOM_SET`, sinon "non".
 
-    Comportement et bords-cases
+    Comportement et cas limites
     ---------------------------
-    - Les valeurs None/NaN ou des tokens vides donnent "non".
-    - La comparaison est insensible à la casse (les tokens sont comparés en majuscules).
-    - Le découpage se fait via l'expression régulière `r"[\s\-_/\.]+"`.
-    - Utilise la variable globale `PRENOM_SET` (chargée depuis `data/base_prenoms.csv`).
+    - Les valeurs None/NaN donnent "non".
+    - La comparaison est insensible à la casse (tokens comparés en majuscules).
+    - Le découpage se fait via `r"[\s\-_/\.]+"`.
 
     Exemple
     -------
-    >>> df = pd.DataFrame([{"prenom": "Jean Paul"}, {"prenom": "Xxx"}])
+    >>> df = pd.DataFrame([{"nom": "MARTIN", "prenom": "Jean Paul"}, {"nom": "DOE", "prenom": "Xxx"}])
     >>> verify_prenom(df, mode="light")["prenom_all_exist"].tolist()
     ['oui', 'non']
-
     '''
     
-    df_normalized = normalize_names(df, mode)
+    df_normalized = normalize_names(df, "light", colonne_nom=colonne_nom, colonne_prenom=colonne_prenom, inplace=inplace)
+
 
     def canon(s):
         if s is None or pd.isna(s):
@@ -478,77 +481,65 @@ def verify_prenom(df, mode: str = "light") -> pd.DataFrame:
         return "oui"
 
 
-    df_normalized["prenom_all_exist"] = df_normalized["prenom"].apply(lambda x: prenom_exists_all_tokens(x, PRENOM_SET))
+    df_normalized["prenom_all_exist"] = df_normalized[colonne_prenom].apply(lambda x: prenom_exists_all_tokens(x, PRENOM_SET))
 
-    return df_normalized
+    return df_normalized[[colonne_nom, colonne_prenom, "prenom_all_exist"]]
 
 
 
 
     #_______________________________PRENOM PLUS PROCHE____________________________________
 
-def rapprocher_prenom(df, mode: str = "light", THRESHOLD=90, MIN_TOKEN_LENGTH=2):
+def rapprocher_prenom(df, colonne_nom = "nom", colonne_prenom = "prenom", THRESHOLD=90, MIN_TOKEN_LENGTH=2, inplace: bool = False) -> pd.DataFrame:
     '''
-    Propose des corrections / rapprochements orthographiques pour les tokens de prénom.
+    Propose des corrections orthographiques pour les tokens de prénom via fuzzy matching.
 
     Description
     -----------
-    Exécute `normalize_names(df, mode)` puis, pour chaque valeur de `prenom_normalized`, tente
-    de rapprocher chaque token à l'aide de `rapidfuzz.process.extractOne` (scorer `fuzz.ratio`)
-    vers le meilleur candidat dans `PRENOM_SET`. Si le score retourné est >= `THRESHOLD`,
-    la correspondance peut être acceptée et le token remplacé.
-
-    Colonnes ajoutées
-    -----------------
-    - `prenom_corrige` : chaîne concaténée des tokens conservés après correction (ou None).
-    - `correction_faite` : bool indiquant si au moins une correction / action a été effectuée.
-    - `detail_corrections` : liste de dictionnaires pour chaque token avec les clés
-      `{ "original", "corrige", "score", "remplace", "garde" }`.
+    Pour chaque valeur de `prenom_normalized`, tente de rapprocher chaque token vers 
+    le meilleur candidat dans `PRENOM_SET` via `rapidfuzz.process.extractOne`. Si 
+    le score >= `THRESHOLD`, le token est remplacé.
 
     Paramètres
     ----------
     df : pandas.DataFrame
-        DataFrame d'entrée (doit contenir ou produire `prenom_normalized` via `normalize_names`).
-    mode : str, optional
-        Valeur transmise à `normalize_names(df, mode)`. Par défaut "light".
+        DataFrame d'entrée contenant idéalement les colonnes `nom` et `prenom`.
+    colonne_nom : str, optional
+        Nom de la colonne contenant les noms. Par défaut "nom".
+    colonne_prenom : str, optional
+        Nom de la colonne contenant les prénoms. Par défaut "prenom".
     THRESHOLD : int, optional
-        Seuil (0-100) de similarité pour accepter une correspondance fuzzy et potentiellement
-        remplacer le token. Par défaut 90.
+        Seuil (0-100) de similarité pour accepter une correspondance fuzzy. Par défaut 90.
     MIN_TOKEN_LENGTH : int, optional
-        Longueur minimale (après mise en majuscules) d'un token pour tenter un rapprochement fuzzy.
-        Les tokens plus courts sont traités comme non remplaçables (score 0). Par défaut 2.
+        Longueur minimale d'un token pour tenter un rapprochement. Par défaut 2.
+    inplace : bool, default False
+        Si True, modifie le DataFrame d'entrée directement.
+        Si False, retourne une copie enrichie.
 
     Valeur retournée
     ----------------
     pandas.DataFrame
-        Copie de la DataFrame normalisée contenant au moins :
-        - `prenom_corrige` (str | None)
-        - `correction_faite` (bool)
-        - `detail_corrections` (list[dict])
+        DataFrame avec les colonnes `colonne_nom`, `colonne_prenom` et :
+        - `prenom_corrige`     : prénom après correction (str | None).
+        - `correction_faite`   : True si au moins une correction a été appliquée.
+        - `detail_corrections` : liste de dicts par token avec les clés
+          `{ "original", "corrige", "score", "remplace", "garde" }`.
 
-    Comportement et détails d'implémentation
-    ----------------------------------------
-    - Si un token est déjà exact (présent dans `PRENOM_SET`) il reçoit `score=100` et est conservé.
-    - Si `process.extractOne` ne trouve aucun candidat, le token d'origine est conservé et `score` vaut `None`.
-    - Les tokens de longueur < `MIN_TOKEN_LENGTH` sont marqués avec `score=0`, `garde=False` et
-      contribuent à `correction_faite=True`.
-    - La fonction interne `corriger_prenom` retourne une structure détaillée par ligne ; la fonction
-      principale applique cette correction en une passe et dépile ensuite les résultats dans les colonnes.
-
-    Dépendances
-    -----------
-    - `rapidfuzz` (process, fuzz)
-    - `PRENOM_SET` (chargé depuis `data/base_prenoms.csv` via la logique du module)
+    Comportement et cas limites
+    ---------------------------
+    - Token déjà exact dans `PRENOM_SET` → score=100, conservé.
+    - Token de longueur < `MIN_TOKEN_LENGTH` → score=0, non gardé.
+    - Aucun candidat trouvé → token original conservé, score=None.
 
     Exemple
     -------
-    >>> df = pd.DataFrame([{"prenom": "Jhn"}, {"prenom": "Marie-Claire"}])
+    >>> df = pd.DataFrame([{"nom": "DOE", "prenom": "Jhn"}])
     >>> out = rapprocher_prenom(df, mode="light", THRESHOLD=85)
-    >>> out.loc[0, "prenom_corrige"]  # si "JOHN" est dans PRENOM_SET et score >= 85
-    'JOHN'  # (exemple illustratif)
+    >>> out.loc[0, "prenom_corrige"]  # si "JOHN" est dans PRENOM_SET
+    'JOHN'
     '''
 
-    df_normalized = verify_prenom(df, mode)
+    df_normalized = normalize_names(df, mode= "light", colonne_nom=colonne_nom, colonne_prenom=colonne_prenom, inplace=inplace)
 
     def canon(s):
         if s is None or pd.isna(s):
@@ -654,7 +645,185 @@ def rapprocher_prenom(df, mode: str = "light", THRESHOLD=90, MIN_TOKEN_LENGTH=2)
     df_normalized["detail_corrections"]  = corrections.apply(lambda x: x["tokens_corriges"])
 
 
+    return df_normalized[[colonne_nom, colonne_prenom, "prenom_corrige", "correction_faite", "detail_corrections"]]
+
+
+
+
+
+def normalize_names_pipeline(df, mode: str = "light", colonne_nom = "nom", colonne_prenom = "prenom", inplace: bool = False, THRESHOLD=90, MIN_TOKEN_LENGTH=2):
+    '''
+    Pipeline complet : normalisation + vérification + rapprochement des prénoms.
+
+    Description
+    -----------
+    Applique en une seule passe les 3 étapes du pipeline :
+    1. `normalize_names` : nettoyage, overlap, pattern detection, normalisation.
+    2. Vérification dictionnaire : colonne `prenom_all_exist`.
+    3. Rapprochement : colonnes `prenom_corrige`, `correction_faite`, `detail_corrections`.
+
+    Paramètres
+    ----------
+    df : pandas.DataFrame
+        DataFrame d'entrée contenant idéalement les colonnes `nom` et `prenom`.
+    mode : str, optional
+        Mode de normalisation (ex: "light", "heavy"). Par défaut "light".
+    colonne_nom : str, optional
+        Nom de la colonne contenant les noms. Par défaut "nom".
+    colonne_prenom : str, optional
+        Nom de la colonne contenant les prénoms. Par défaut "prenom".
+    inplace : bool, default False
+        Si True, modifie le DataFrame d'entrée directement.
+        Si False, retourne une copie enrichie.
+    THRESHOLD : int, optional
+        Seuil de similarité pour le rapprochement fuzzy. Par défaut 90.
+    MIN_TOKEN_LENGTH : int, optional
+        Longueur minimale d'un token pour tenter un rapprochement. Par défaut 2.
+
+    Valeur retournée
+    ----------------
+    pandas.DataFrame
+        DataFrame enrichie avec toutes les colonnes ajoutées par le pipeline :
+        - `nom_clean`, `prenom_clean`
+        - `overlap_action`
+        - `schema_nom`, `schema_prenom`
+        - `nom_normalized`, `prenom_normalized`
+        - `prenom_all_exist`
+        - `prenom_corrige`, `correction_faite`, `detail_corrections`
+
+    Exemple
+    -------
+    >>> df = pd.DataFrame([{"nom": "D'ARAGON", "prenom": "Jean-Paul"}, {"nom": "DOE", "prenom": None}])
+    >>> out = normalize_names_pipeline(df, mode="light")
+    >>> "prenom_corrige" in out.columns
+    True
+    '''
+    
+    df_normalized = normalize_names(df, mode=mode, colonne_nom = colonne_nom, colonne_prenom = colonne_prenom, inplace=inplace)
+    def canon(s):
+        if s is None or pd.isna(s):
+            return None
+        s = s.upper()
+        return s
+
+    def prenom_exists_all_tokens(prenom_raw, prenom_set_canon):
+        if prenom_raw is None or pd.isna(prenom_raw):
+            return "non"
+        
+        # split sur séparateurs identifiés
+        tokens = re.split(r"[\s\-_/\.]+", str(prenom_raw).strip())
+        tokens = [t for t in tokens if t]
+        
+        if not tokens:
+            return "non"
+        
+        for token in tokens:
+            if canon(token) not in prenom_set_canon:
+                return "non"
+        
+        return "oui"
+
+
+    df_normalized["prenom_all_exist"] = df_normalized[colonne_prenom].apply(lambda x: prenom_exists_all_tokens(x, PRENOM_SET))
+    
+
+    def rapprocher_token(token, prenom_set_canon, threshold, min_length=MIN_TOKEN_LENGTH):
+        token_canon = canon(token)
+        
+        if len(token_canon) < min_length:
+            return token_canon, 0
+        
+        if token_canon in prenom_set_canon:
+            return token_canon, 100
+        
+        result = process.extractOne(
+            token_canon,
+            prenom_set_canon,
+            scorer=fuzz.ratio
+        )
+        
+        if result is None:
+            return token_canon, None
+        
+        best_match, score, _ = result
+        
+        if score >= threshold:
+            return best_match, score
+        else:
+            return token_canon, score
+
+
+    def corriger_prenom(prenom_raw, prenom_set_canon, threshold=80, min_length=MIN_TOKEN_LENGTH):
+        if prenom_raw is None or pd.isna(prenom_raw):
+            return {"prenom_corrige": None, "tokens_corriges": [], "correction_faite": False}
+        
+        tokens = re.split(r"[\s\-_/\.]+", str(prenom_raw).strip())
+        tokens = [t for t in tokens if t]
+        
+        if not tokens:
+            return {"prenom_corrige": prenom_raw, "tokens_corriges": [], "correction_faite": False}
+        
+        tokens_corriges = []
+        correction_faite = False
+        
+        for token in tokens:
+            token_canon = canon(token)
+            
+            if len(token_canon) < min_length:
+                correction_faite = True
+                tokens_corriges.append({
+                    "original": token,
+                    "corrige": token_canon,
+                    "score": 0,
+                    "remplace": False,
+                    "garde": False
+                })
+                continue
+            
+            if token_canon in prenom_set_canon:
+                tokens_corriges.append({
+                    "original": token,
+                    "corrige": token_canon,
+                    "score": 100,
+                    "remplace": False,
+                    "garde": True
+                })
+            else:
+                best, score = rapprocher_token(token, prenom_set_canon, threshold, min_length)
+                remplace = (score is not None and score >= threshold and best != token_canon)
+                garde = (score is not None and score >= threshold)
+                
+                if remplace or not garde:
+                    correction_faite = True
+                    
+                tokens_corriges.append({
+                    "original": token,
+                    "corrige": best if remplace else token_canon,
+                    "score": score,
+                    "remplace": remplace,
+                    "garde": garde
+                })
+        
+        tokens_valides = [t["corrige"] for t in tokens_corriges if t["garde"]]
+        prenom_corrige = " ".join(tokens_valides) if tokens_valides else None
+
+        return {
+            "prenom_corrige": prenom_corrige,
+            "tokens_corriges": tokens_corriges,
+            "correction_faite": correction_faite
+        }
+
+
+    # ______________________________________ Application __________________________________________
+    # On applique UNE SEULE FOIS et on stocke dans une Series de dicts
+    corrections = df_normalized["prenom_normalized"].apply(
+        lambda x: corriger_prenom(x, PRENOM_SET, threshold=THRESHOLD, min_length=MIN_TOKEN_LENGTH)
+    )
+
+    # Ensuite on dépaque chaque clé séparément
+    df_normalized["prenom_corrige"]      = corrections.apply(lambda x: x["prenom_corrige"])
+    df_normalized["correction_faite"]    = corrections.apply(lambda x: x["correction_faite"])
+    df_normalized["detail_corrections"]  = corrections.apply(lambda x: x["tokens_corriges"])
+
+
     return df_normalized
-
-
-
