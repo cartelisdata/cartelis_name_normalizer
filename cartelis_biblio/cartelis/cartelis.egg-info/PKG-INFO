@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: cartelis
-Version: 1.7.4
+Version: 1.8.7
 Summary: Normalisation des noms et prénoms (nettoyage, patterns, détection d’anomalies)
 Home-page: https://github.com/vous/ma-biblio
 Author: Adam El Hachimi
@@ -10,12 +10,15 @@ Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
+Requires-Dist: pandas
+Requires-Dist: rapidfuzz
 Dynamic: author
 Dynamic: author-email
 Dynamic: classifier
 Dynamic: description
 Dynamic: description-content-type
 Dynamic: home-page
+Dynamic: requires-dist
 Dynamic: requires-python
 Dynamic: summary
 

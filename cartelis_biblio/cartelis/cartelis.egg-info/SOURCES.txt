@@ -5,9 +5,12 @@ cartelis/__init__.py
 cartelis.egg-info/PKG-INFO
 cartelis.egg-info/SOURCES.txt
 cartelis.egg-info/dependency_links.txt
+cartelis.egg-info/requires.txt
 cartelis.egg-info/top_level.txt
 cartelis/audit_loss/__init__.py
 cartelis/audit_loss/module.py
+cartelis/extract_same_email_or_phone/__init__.py
+cartelis/extract_same_email_or_phone/module.py
 cartelis/name_normalizer/__init__.py
 cartelis/name_normalizer/action_map.py
 cartelis/name_normalizer/actions.py
@@ -15,8 +18,12 @@ cartelis/name_normalizer/module.py
 cartelis/name_normalizer/rule_engine.py
 cartelis/name_normalizer/rules_manager.py
 cartelis/name_normalizer/data/base_prenoms.csv
+cartelis/name_normalizer/data/prenom_clean_vfinal.csv
 cartelis/name_normalizer/data/regles_normalisation_heavy.xlsx
 cartelis/name_normalizer/data/regles_normalisation_light.xlsx
 cartelis/name_normalizer/data/sample_personne_test.csv
+cartelis/region_identifier/__init__.py
+cartelis/region_identifier/module.py
+cartelis/region_identifier/data/regions.csv
 cartelis/telephone_normalizer_fr/__init__.py
 cartelis/telephone_normalizer_fr/module.py

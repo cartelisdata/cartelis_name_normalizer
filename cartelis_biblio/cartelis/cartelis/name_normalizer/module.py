@@ -12,7 +12,7 @@ from .rule_engine import _load_rules, apply_rule, _normalize_token
 
 # Chargement du dictionnaire de prénoms
 _DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-base_prenoms = pd.read_csv(os.path.join(_DATA_DIR, "base_prenoms.csv"))
+base_prenoms = pd.read_csv(os.path.join(_DATA_DIR, "prenom_clean_vfinal.csv"))
 PRENOM_SET = {_normalize_token(p) for p in base_prenoms["first_name_norm"].dropna().unique() if p}
 
 
@@ -70,7 +70,7 @@ def normalize_names(df, mode: str = "light", colonne_nom = "nom", colonne_prenom
     Dépendances et prérequis
     -----------------------
     - `rule_engine._load_rules`, `rule_engine.apply_rule`, `rule_engine._normalize_token`.
-    - Le fichier `data/base_prenoms.csv` doit être présent dans le paquet pour initialiser le dictionnaire
+    - Le fichier `data/prenom_clean_vfinal.csv` doit être présent dans le paquet pour initialiser le dictionnaire
       de prénoms (`PRENOM_SET`).
     - `pandas`, `unicodedata`, `re` doivent être disponibles.
 
@@ -254,7 +254,7 @@ def normalize_names(df, mode: str = "light", colonne_nom = "nom", colonne_prenom
         # --- Petit résumé  ---
         df_clean["overlap_action"].value_counts()
         df_clean.loc[df_clean["overlap_action"].str.startswith("removed_"),
-                                ["nom","prenom","nom_clean","prenom_clean","overlap_action"]]
+                                [colonne_nom,colonne_prenom,"nom_clean","prenom_clean","overlap_action"]]
         
 
         df_final = df_clean
@@ -389,7 +389,7 @@ def normalize_names(df, mode: str = "light", colonne_nom = "nom", colonne_prenom
 
         # Chargement du dictionnaire de prénoms
         _DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-        base_prenoms = pd.read_csv(os.path.join(_DATA_DIR, "base_prenoms.csv"))
+        base_prenoms = pd.read_csv(os.path.join(_DATA_DIR, "prenom_clean_vfinal.csv"))
         PRENOM_SET = {_normalize_token(p) for p in base_prenoms["first_name_norm"].dropna().unique() if p}
 
         # Application nom
